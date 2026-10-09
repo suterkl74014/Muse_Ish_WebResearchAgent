@@ -24,7 +24,9 @@ WebAgent intentionally:
 - does not attempt to solve or bypass CAPTCHA/human-verification challenges;
 - pauses the autonomous loop during detected human verification;
 - restricts file tools to the configured workspace root;
-- avoids displaying/storing raw provider keys in normal WebAgent configuration;
+- stores Groq/Gemini/OpenRouter raw API keys through the operating-system credential store rather than config.json or the credential metadata file;
+- does not consume API-key environment variables for those providers;
+- reads legacy AgentSmith/GroqVM API keys only after an explicit import action;
 - redacts secrets from diagnostic logs where implemented; and
 - instructs the browser agent to stop before consequential final actions.
 

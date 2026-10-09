@@ -1,12 +1,12 @@
 [project]
 name = "webagent"
-version = "0.3.9.4"
+version = "0.3.10"
 description = "Open-source visible-browser AI agent with persistent chats, deep research, human takeover, evidence and artifacts"
 readme = "README.md"
 license = { text = "MIT" }
 keywords = ["ai-agent", "browser-automation", "playwright", "deep-research", "human-in-the-loop"]
 requires-python = ">=3.10"
-dependencies = ["PySide6>=6.8,<7", "playwright>=1.49,<2", "httpx>=0.27,<1", "pydantic>=2.8,<3", "python-docx>=1.1,<2", "openpyxl>=3.1,<4", "reportlab>=4.2,<5", "beautifulsoup4>=4.12,<5"]
+dependencies = ["PySide6>=6.8,<7", "playwright>=1.49,<2", "httpx>=0.27,<1", "pydantic>=2.8,<3", "python-docx>=1.1,<2", "openpyxl>=3.1,<4", "reportlab>=4.2,<5", "beautifulsoup4>=4.12,<5", "keyring>=25"]
 
 [project.scripts]
 webagent = "webagent.app:main"

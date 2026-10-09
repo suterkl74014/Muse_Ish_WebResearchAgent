@@ -30,18 +30,18 @@ python
 Create a GitHub release/tag named:
 
 ```text
-v0.3.9.4
+v0.3.10
 ```
 
 Suggested title:
 
 ```text
-WebAgent v0.3.9.4 — Human Verification Handoff
+WebAgent v0.3.10 — Standalone Bring-Your-Own API Keys
 ```
 
 Suggested summary:
 
-> WebAgent is an MIT-licensed visible-browser AI agent for Windows. v0.3.9.4 adds safe human-verification handoff: when a CAPTCHA or verification challenge appears, automation pauses, foregrounds Chromium, waits for the user to complete it, then resumes after the page is clean.
+> WebAgent is an MIT-licensed visible-browser AI agent for Windows. v0.3.10 makes provider setup standalone: users can add as many Groq, Gemini, and OpenRouter API keys as they want directly in WebAgent, with raw secrets kept in the OS credential store. AgentSmith/GroqVM is optional rather than required.
 
 ## Make the repo easier to discover
 

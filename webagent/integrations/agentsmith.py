@@ -52,7 +52,7 @@ class AgentSmithBridge:
         except Exception:
             return []
 
-    def discover(self) -> AgentSmithEnvironment:
+    def discover(self, include_secrets: bool = True) -> AgentSmithEnvironment:
         env = AgentSmithEnvironment()
         candidates = []
         if self.preferred_distro:
@@ -82,16 +82,18 @@ cfg={}
 try: cfg=json.loads(Path('/etc/groqvm/config.json').read_text())
 except Exception: pass
 sec={}
-try:
-    for raw in Path('/etc/groqvm/secrets.env').read_text().splitlines():
-        line=raw.strip()
-        if line and not line.startswith('#') and '=' in line:
-            k,v=line.split('=',1); sec[k.strip()]=v.strip()
-except Exception: pass
+if __INCLUDE_SECRETS__:
+    try:
+        for raw in Path('/etc/groqvm/secrets.env').read_text().splitlines():
+            line=raw.strip()
+            if line and not line.startswith('#') and '=' in line:
+                k,v=line.split('=',1); sec[k.strip()]=v.strip()
+    except Exception: pass
 candidates=[os.environ.get('CODEX_BIN',''), os.environ.get('CODEX_PATH',''), shutil.which('codex') or '', str(Path.home()/'.local/bin/codex'), '/usr/local/bin/codex', '/usr/bin/codex']
 codex=next((p for p in candidates if p and Path(p).is_file()), None)
 print(json.dumps({'config':cfg,'secrets':sec,'codex_path':codex}))
 PY'''
+        script = script.replace('__INCLUDE_SECRETS__', 'True' if include_secrets else 'False')
         try:
             p = self._wsl(["--", "sh", "-lc", script], env.distro)
             if p.returncode != 0:

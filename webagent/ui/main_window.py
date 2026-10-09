@@ -21,7 +21,7 @@ class MainWindow(QMainWindow):
     def __init__(self,env,broker,browser,db,workspace,config,diagnostics=None,db_path=None,config_path=None):
         super().__init__(); self.env=env; self.broker=broker; self.browser=browser; self.db=db; self.workspace=workspace; self.config=config; self.diagnostics=diagnostics; self.db_path=db_path; self.config_path=config_path
         self.signals=Signals(); self.runner=V3Runner(broker,browser,db,workspace,self._thread_event,research=ResearchEngine(diagnostics=diagnostics),diagnostics=diagnostics); self.worker=None; self.current_chat_id=None; self.running_chat_id=None
-        self.setWindowTitle("Web Agent v0.3.9.4"); self.resize(1480,900); self.setMinimumSize(1100,700)
+        self.setWindowTitle("Web Agent v0.3.10"); self.resize(1480,900); self.setMinimumSize(1100,700)
         self._build(); self.signals.event.connect(self._event); self.signals.done.connect(self._done); self.signals.error.connect(self._error); self.signals.models.connect(self._apply_models)
         self.live_timer=QTimer(self); self.live_timer.setInterval(700); self.live_timer.timeout.connect(self._live_refresh); self.live_timer.start()
         self.refresh_providers(); self._routing_mode_changed(self.mode.currentText()); self.refresh_chats(select_first=True)
@@ -86,8 +86,11 @@ class MainWindow(QMainWindow):
 
     def show_provider_settings(self):
         d=ProviderSettingsDialog(self,self.broker,self.env,self.config)
-        if d.exec():
-            self.refresh_providers()
+        accepted=d.exec()
+        # API-key add/remove operations apply immediately even if routing edits
+        # are later cancelled, so always refresh the main provider bar.
+        self.refresh_providers()
+        if accepted:
             self.mode.setCurrentText(self.config.mode)
             self.activity.appendPlainText("[SETTINGS] Provider/model settings updated.")
 
@@ -126,7 +129,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self,"Model limits & rate status","\n\n".join(lines) if lines else "No provider/model selected.")
 
     def refresh_providers(self):
-        avail=self.broker.available(); self.env_label.setText(f"AgentSmith: {self.env.distro or 'not found'}  •  Groq {len(self.env.groq_keys)}  •  Gemini {len(self.env.gemini_keys)}  •  OpenRouter {len(self.env.openrouter_keys)}  •  ChatGPT CLI {'✓' if self.env.codex_path else '—'}")
+        avail=self.broker.available(); self.env_label.setText(f"WebAgent keys: Groq {self.broker.key_count('groq')}  •  Gemini {self.broker.key_count('gemini')}  •  OpenRouter {self.broker.key_count('openrouter')}  •  Optional Codex CLI {'✓' if self.env.codex_path else '—'}")
         specs=[(self.primary_p,self.primary_m,self.config.primary_provider,self.config.primary_model),(self.browser_p,self.browser_m,self.config.browser_provider,self.config.browser_model),(self.final_p,self.final_m,self.config.final_provider,self.config.final_model)]
         for pb,mb,wanted_p,wanted_m in specs:
             pb.blockSignals(True); pb.clear(); pb.addItems(avail); pb.setCurrentText(wanted_p if wanted_p in avail else (avail[0] if avail else "")); pb.blockSignals(False)

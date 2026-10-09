@@ -2,8 +2,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from PySide6.QtWidgets import QApplication, QMessageBox
-from .config import AppConfig, APP_DIR, DB_PATH, BROWSER_DIR, DOWNLOAD_DIR, DIAGNOSTIC_DIR, CONFIG_PATH
+from .config import AppConfig, APP_DIR, DB_PATH, BROWSER_DIR, DOWNLOAD_DIR, DIAGNOSTIC_DIR, CONFIG_PATH, CREDENTIALS_PATH
 from .integrations.agentsmith import AgentSmithBridge
+from .credentials import CredentialStore
 from .providers.broker import ModelBroker
 from .browser.manager import BrowserManager
 from .memory.db import Database
@@ -38,9 +39,15 @@ def main():
     app=QApplication(sys.argv); app.setApplicationName("Web Agent"); cfg=AppConfig.load()
     if cfg.dark_theme: app.setStyleSheet(DARK_QSS)
     diagnostics=DiagnosticManager(DIAGNOSTIC_DIR)
-    env=AgentSmithBridge().discover(); env.webagent_config=cfg; env.config.setdefault('rate_limit_max_wait_seconds',cfg.rate_limit_max_wait_seconds); broker=ModelBroker(env,diagnostics=diagnostics,data_dir=APP_DIR); db=Database(DB_PATH); browser=BrowserManager(BROWSER_DIR,DOWNLOAD_DIR,diagnostics=diagnostics); workspace=WorkspaceManager(Path(cfg.workspace_root),db)
+    # AgentSmith/GroqVM discovery is optional compatibility only. Its API keys are
+    # never consumed automatically; users may explicitly import them later.
+    env=AgentSmithBridge().discover(include_secrets=False); env.webagent_config=cfg; env.config.setdefault('rate_limit_max_wait_seconds',cfg.rate_limit_max_wait_seconds)
+    credentials=CredentialStore(CREDENTIALS_PATH)
+    broker=ModelBroker(env,diagnostics=diagnostics,data_dir=APP_DIR,credential_store=credentials)
+    db=Database(DB_PATH); browser=BrowserManager(BROWSER_DIR,DOWNLOAD_DIR,diagnostics=diagnostics); workspace=WorkspaceManager(Path(cfg.workspace_root),db)
     w=MainWindow(env,broker,browser,db,workspace,cfg,diagnostics,DB_PATH,CONFIG_PATH); w.show()
-    if env.error: QMessageBox.warning(w,"AgentSmith discovery",env.error+"\n\nWeb Agent can still start, but provider access may be unavailable.")
+    if not broker.available():
+        QMessageBox.information(w,"Add an API key","WebAgent is ready. Open Providers & Models → API Keys to add your own Groq, Gemini, or OpenRouter key. AgentSmith/GroqVM is optional and is not required.")
     sys.exit(app.exec())
 
 if __name__=="__main__": main()

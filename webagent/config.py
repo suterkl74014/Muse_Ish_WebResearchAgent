@@ -11,6 +11,7 @@ DOWNLOAD_DIR = APP_DIR / "downloads"
 DIAGNOSTIC_DIR = APP_DIR / "diagnostics"
 SHARED_DIR = APP_DIR / "shared"
 OPENROUTER_LEDGER_PATH = SHARED_DIR / "openrouter_quota.sqlite3"
+CREDENTIALS_PATH = APP_DIR / "credentials.json"  # metadata only; raw keys live in the OS credential store
 DEFAULT_WORKSPACE = Path.home() / "Documents" / "WebAgent Workspace"
 
 @dataclass

@@ -5,9 +5,9 @@ import httpx
 from .base import Completion, ModelInfo, RateLimitError, ContextLimitError, AuthenticationError, TransientProviderError, ModelUnavailableError
 from .rate_limits import estimate_tokens, retry_after_seconds, is_rate_limit, RollingTokenLimiter, DailyAttemptLedger
 
-# Maintained free-tier registries mirrored from the installed AgentSmith build.
-# Live discovery is intersected with these lists for Groq/Gemini because their
-# model-list endpoints do not provide reliable per-model free-pricing metadata.
+# Maintained WebAgent free-tier allowlists. Live discovery is intersected with
+# these lists for Groq/Gemini because their model-list endpoints do not provide
+# reliable per-model free-pricing metadata.
 GROQ_FREE_CHAT_MODELS = {
     "openai/gpt-oss-120b", "openai/gpt-oss-20b",
     "qwen/qwen3.8-27b", "qwen/qwen3.6-27b",
@@ -63,6 +63,12 @@ class ResilientKeyPool:
     def key_rows(self):
         with self.lock:
             return [{'index':i,'label':f'Key {i+1}','fingerprint':self.fingerprint(k),'enabled':i not in self.disabled,'in_use':i in self.in_use} for i,k in enumerate(self.keys)]
+    def replace_keys(self, keys:list[str], disabled_fingerprints=None):
+        with self.lock:
+            self.keys=[k for k in keys if k]; self.cursor=0; self.cooldowns={}; self.denied=set(); self.in_use=set(); self.disabled=set()
+            disabled=set(disabled_fingerprints or [])
+            for i,k in enumerate(self.keys):
+                if self.fingerprint(k) in disabled:self.disabled.add(i)
 
 class HTTPProviderBase:
     name='http'
@@ -103,11 +109,15 @@ class HTTPProviderBase:
         except Exception:return str(exc)
     def health(self):
         now=time.monotonic(); return {'provider':self.name,'keys':len(self.pool.keys),'enabled_keys':len(self.pool.keys)-len(self.pool.disabled),'disabled_keys':len(self.pool.disabled),'in_use_keys':len(self.pool.in_use),'cooldowns':[{'key':i+1,'model':m,'seconds':round(u-now,1)} for (i,m),u in self.pool.cooldowns.items() if u>now]}
+    def replace_keys(self,keys,disabled_fingerprints=None):
+        self.pool.replace_keys(list(keys),disabled_fingerprints=disabled_fingerprints)
 
 class GroqProvider(HTTPProviderBase):
     name='groq'
     def __init__(self,keys,configured_models=None,**kw):
         token_limit=int(kw.pop('token_limit',7000)); super().__init__(keys,configured_models,**kw); self.token_limit_default=token_limit; self.token_limiters={i:RollingTokenLimiter(token_limit,60) for i in range(len(self.pool.keys))}
+    def replace_keys(self,keys,disabled_fingerprints=None):
+        super().replace_keys(keys,disabled_fingerprints=disabled_fingerprints); self.token_limiters={i:RollingTokenLimiter(self.token_limit_default,60) for i in range(len(self.pool.keys))}
     def health(self):
         row=super().health(); row['token_budgets']=[dict(key=i+1,**lim.snapshot()) for i,lim in self.token_limiters.items()]; return row
     def models(self):
@@ -124,13 +134,13 @@ class GroqProvider(HTTPProviderBase):
                 mid=x.get('id');
                 if not mid or mid not in GROQ_FREE_CHAT_MODELS:continue
                 ctx=x.get('context_window') or x.get('context_length'); maxout=x.get('max_completion_tokens') or x.get('max_output_tokens')
-                infos[mid]=ModelInfo(self.name,mid,int(ctx) if ctx else None,int(maxout) if maxout else None,free=True,source='live-groq+agentsmith-free-registry',raw=x)
+                infos[mid]=ModelInfo(self.name,mid,int(ctx) if ctx else None,int(maxout) if maxout else None,free=True,source='live-groq+webagent-free-registry',raw=x)
             if infos:self._model_info=infos; self._catalog_at=time.monotonic()
         except Exception as e:self._log('model_catalog_error',error=str(e))
         return sorted(self._model_info) if self._model_info else [m for m in self.configured if m in GROQ_FREE_CHAT_MODELS]
     def complete(self,prompt,model=None,system=None):
         if not self.pool.keys:raise RuntimeError('No Groq API keys configured')
-        if model and model not in GROQ_FREE_CHAT_MODELS: raise ModelUnavailableError(f'Groq model is not in Web Agent/AgentSmith free-model registry: {model}',provider=self.name,model=model,kind='not_free')
+        if model and model not in GROQ_FREE_CHAT_MODELS: raise ModelUnavailableError(f"Groq model is not in WebAgent's verified free-model registry: {model}",provider=self.name,model=model,kind='not_free')
         last=None; models=self._ordered_models(model)
         for mid in models:
             if mid not in GROQ_FREE_CHAT_MODELS:
@@ -198,7 +208,7 @@ class GeminiProvider(HTTPProviderBase):
                 if 'generateContent' not in (x.get('supportedGenerationMethods') or []):continue
                 mid=str(x.get('name','')).removeprefix('models/');
                 if not mid or mid not in GEMINI_FREE_MODELS:continue
-                infos[mid]=ModelInfo(self.name,mid,int(x.get('inputTokenLimit') or 0) or None,int(x.get('outputTokenLimit') or 0) or None,free=True,source='live-gemini+agentsmith-free-registry',raw=x)
+                infos[mid]=ModelInfo(self.name,mid,int(x.get('inputTokenLimit') or 0) or None,int(x.get('outputTokenLimit') or 0) or None,free=True,source='live-gemini+webagent-free-registry',raw=x)
             if infos:self._model_info=infos;self._catalog_at=time.monotonic()
         except Exception as e:self._log('model_catalog_error',error=str(e))
         return sorted(self._model_info) if self._model_info else [m for m in self.configured if m in GEMINI_FREE_MODELS]
@@ -275,7 +285,7 @@ class OpenRouterProvider(HTTPProviderBase):
             external_usage=self.external_usage_sync() if self.external_usage_sync else {}
         except Exception as e:
             self._log('external_quota_sync_failed',error=str(e))
-            raise RateLimitError(f'OpenRouter safety ledger could not synchronize AgentSmith usage; refusing request: {e}',provider=self.name,model=model or '',kind='quota_history_unavailable')
+            raise RateLimitError(f'OpenRouter safety ledger could not synchronize optional legacy usage; refusing request: {e}',provider=self.name,model=model or '',kind='quota_history_unavailable')
         last=None
         for mid in self._ordered_models(model):
             info=self.model_info(mid)

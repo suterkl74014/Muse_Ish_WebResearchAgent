@@ -5,13 +5,13 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-2ea44f)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-39%20passing-success)
+![Tests](https://img.shields.io/badge/tests-45%20passing-success)
 
 WebAgent is a desktop AI agent that can **plan a goal, research the web, drive a visible Chromium browser, collect evidence, create files, remember the current chat, and hand control back to you when a human needs to step in**.
 
 It is built for people who want an agent they can actually *watch* work.
 
-**Current release: `v0.3.9.4`**
+**Current release: `v0.3.10`**
 
 > [!IMPORTANT]
 > WebAgent is an independent open-source project. It is **not affiliated with, endorsed by, or derived from Meta Muse**. The project uses “Muse-like” below only to describe familiar product interaction patterns such as conversational tasking, a visible browser, persistent context, and human takeover.
@@ -28,7 +28,8 @@ Most browser-agent demos hide the interesting part behind a spinner. WebAgent is
 - **Real research plans** — complex goals become a persistent task graph instead of one giant prompt.
 - **Evidence-first synthesis** — research results are grounded in stored sources and artifacts.
 - **Actual deliverables** — the agent can create Markdown, text, JSON, CSV, DOCX, XLSX, PDF, and other text-based artifacts.
-- **Multi-provider routing** — use Groq, Gemini, OpenRouter, or an existing authenticated ChatGPT/Codex CLI setup.
+- **Bring your own API keys** — add one key or paste hundreds for Groq, Gemini, and OpenRouter directly in WebAgent; no API-key environment variables or pre-existing AgentSmith install are required.
+- **Multi-provider routing** — use your WebAgent-managed Groq, Gemini, and OpenRouter keys, plus an optional authenticated ChatGPT/Codex CLI compatibility path.
 - **Free-model safeguards** — provider discovery and execution enforce the project's free-only policy where implemented.
 - **Verification handoff** — CAPTCHA/human-verification challenges are never bypassed; automation pauses and waits for you.
 - **Diagnostics you can inspect** — per-run logs and a redacted diagnostic ZIP make failures easier to understand.
@@ -166,10 +167,18 @@ The agent's file tools are restricted to the configured workspace root.
 
 Supported provider paths in this release:
 
-- **Groq**
-- **Gemini**
-- **OpenRouter**
-- **ChatGPT/Codex CLI** discovered from the existing AgentSmith/GroqVM WSL environment
+- **Groq** — add your own key(s) in the WebAgent UI
+- **Gemini** — add your own key(s) in the WebAgent UI
+- **OpenRouter** — add your own key(s) in the WebAgent UI
+- **ChatGPT/Codex CLI** — optional compatibility path when an authenticated CLI is discovered in an existing AgentSmith/GroqVM WSL environment
+
+### 🔑 Standalone API-key management
+
+Open **Providers & Models → API Keys** and paste one key per line. WebAgent has **no application-imposed key-count limit**: you can add one key, ten keys, or hundreds of keys per supported API provider.
+
+WebAgent does **not** read `GROQ_API_KEY`, `GEMINI_API_KEY`, or `OPENROUTER_API_KEY` environment variables, and it does not require those keys to already exist in WSL or another app. Raw keys are stored through the operating-system credential store; WebAgent keeps only non-secret metadata such as provider, label, and fingerprint in its local metadata file.
+
+If you already use AgentSmith/GroqVM, **Import AgentSmith keys…** is an optional migration helper. Legacy secrets are read only after you explicitly choose that import action.
 
 Routing modes:
 
@@ -196,6 +205,8 @@ flowchart LR
     R --> WEB[Public Web]
     B --> CHROME[Visible Chromium / Playwright]
     COORD --> BROKER[Model Broker]
+    UI --> VAULT[OS Credential Store]
+    VAULT --> BROKER
     BROKER --> G[Groq]
     BROKER --> GM[Gemini]
     BROKER --> OR[OpenRouter]
@@ -207,7 +218,7 @@ flowchart LR
     A --> DB
 ```
 
-The app is standalone: it does **not** import or reuse AgentSmith's agent, browser, UI, prompts, executor, or database. The current provider bridge reads an existing AgentSmith/GroqVM WSL configuration and credentials at runtime.
+The app is standalone: it does **not** import or reuse AgentSmith's agent, browser, UI, prompts, executor, database, or API-key environment. WebAgent manages its own Groq/Gemini/OpenRouter credentials. AgentSmith/GroqVM support is optional compatibility only: WebAgent may discover an authenticated Codex CLI, and legacy API keys are read only when the user explicitly chooses the import action.
 
 ---
 
@@ -219,10 +230,11 @@ Current release target:
 - **Python 3.10+**
 - PowerShell
 - Playwright Chromium (installed automatically by the setup script)
-- For provider access in the current build: an existing **AgentSmith/GroqVM WSL environment** containing provider configuration/API keys and/or an authenticated ChatGPT/Codex CLI
+- At least one API key for **Groq, Gemini, or OpenRouter** if you want model access through those providers
+- **No AgentSmith/GroqVM install is required**
 
 > [!NOTE]
-> WebAgent can start when AgentSmith/GroqVM discovery fails, but provider access may be unavailable. A future goal is fully standalone credential/provider configuration.
+> An existing AgentSmith/GroqVM WSL setup is optional. It is used only for the optional Codex CLI compatibility path and explicit legacy-key migration.
 
 ---
 
@@ -268,13 +280,14 @@ python -m webagent.app
 ## Typical workflow
 
 1. Open WebAgent.
-2. Create a new chat.
-3. Pick **Quick**, **Standard**, or **Deep** research.
-4. Choose Automatic, Hybrid, or Manual routing.
-5. Describe the goal in normal language.
-6. Watch the task plan and visible browser activity.
-7. Use **Pause / Take Control** whenever direct input is needed.
-8. Open generated files from the Files panel and evidence pages from Sources.
+2. Open **Providers & Models → API Keys** and add your own Groq, Gemini, or OpenRouter key(s).
+3. Create a new chat.
+4. Pick **Quick**, **Standard**, or **Deep** research.
+5. Choose Automatic, Hybrid, or Manual routing.
+6. Describe the goal in normal language.
+7. Watch the task plan and visible browser activity.
+8. Use **Pause / Take Control** whenever direct input is needed.
+9. Open generated files from the Files panel and evidence pages from Sources.
 
 Example goals:
 
@@ -325,7 +338,9 @@ The configured workspace defaults to your Documents folder.
 
 Security/reliability choices in the current build include:
 
-- raw API keys are not written into WebAgent's normal config;
+- raw API keys are not written into WebAgent's normal config or credential metadata file;
+- raw Groq/Gemini/OpenRouter keys are stored through the operating-system credential store (Windows Credential Manager via Python `keyring` on the supported Windows build);
+- API-key environment variables are not required or consumed for these providers;
 - UI key management uses stable key fingerprints;
 - diagnostics redact secrets;
 - OpenRouter usage tracking stores a SHA-256 key fingerprint rather than raw keys;
@@ -363,7 +378,7 @@ python -m pytest -q
 Current repository result:
 
 ```text
-39 passed
+45 passed
 ```
 
 GitHub Actions also runs the unit test suite on pushes and pull requests.
@@ -377,7 +392,8 @@ webagent/
   agent/          planner, browser loop, v3 coordinator
   browser/        Playwright browser manager
   files/          workspace and artifact tools
-  integrations/   AgentSmith/GroqVM compatibility bridge
+  integrations/   optional AgentSmith/GroqVM compatibility bridge
+  credentials.py  WebAgent-owned OS credential-store registry
   memory/         SQLite persistence
   providers/      providers, routing, quotas, rate limits
   ui/             PySide6 desktop UI
@@ -404,6 +420,7 @@ Important docs:
 - [V0.3.9.3-ACTION-SCHEMA-HOTFIX.md](V0.3.9.3-ACTION-SCHEMA-HOTFIX.md)
 - [V0.3.9.3-CONVERSATIONAL-MEMORY.md](V0.3.9.3-CONVERSATIONAL-MEMORY.md)
 - [V0.3.9.4-HUMAN-VERIFICATION-HANDOFF.md](V0.3.9.4-HUMAN-VERIFICATION-HANDOFF.md)
+- [V0.3.10-STANDALONE-CREDENTIALS.md](V0.3.10-STANDALONE-CREDENTIALS.md)
 - [CHANGELOG.md](CHANGELOG.md)
 
 ---
@@ -419,7 +436,7 @@ The existing roadmap points toward:
 - reusable workflows
 - stronger resume/recovery behavior
 - more explicit consequential-action approvals
-- more standalone provider configuration
+- additional standalone provider adapters and credential backends
 
 Issues and pull requests for well-scoped improvements are welcome.
 

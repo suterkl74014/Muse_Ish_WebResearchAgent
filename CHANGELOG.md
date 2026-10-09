@@ -2,6 +2,18 @@
 
 This file is a concise index. Detailed implementation notes for each release remain in the versioned Markdown files in the repository root.
 
+## v0.3.10
+
+- Added standalone WebAgent-owned API-key management for Groq, Gemini, and OpenRouter.
+- Users can paste one key or arbitrarily large key lists; WebAgent imposes no key-count limit.
+- Raw keys live in the operating-system credential store; local metadata contains fingerprints/labels only.
+- API-key environment variables and AgentSmith/GroqVM secrets are no longer assumed or silently consumed.
+- Legacy AgentSmith key migration is explicit and user-triggered.
+- Added live provider-key reload after add/remove and standalone OpenRouter operation without AgentSmith quota sync.
+- Expanded regression coverage to 45 passing tests, including 250-key storage.
+
+See `V0.3.10-STANDALONE-CREDENTIALS.md`.
+
 ## v0.3.9.4
 
 - Added human-verification/CAPTCHA detection outside the model loop.
